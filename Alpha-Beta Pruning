@@ -1,0 +1,131 @@
+#Task-1
+import random, math
+id = input()
+if id[3] == '0':
+  id = id[:3]+'8'+id[4:]
+# print(id)
+low = int(id[4])
+to_win = int(id[-1]+id[-2])
+# print(to_win)
+high = str(to_win*1.5)
+for i in range(len(high)):
+  if high[i] == '.':
+    if high[i+1] == '0':
+      high = int(high)
+    else:
+      high = int(float(high))+1
+    break
+limits = []
+for i in range(len(id)):
+  limits.append(random.randint(low,high))
+# print(f"low:{low}, high:{high}")
+# print(limits)
+
+#Making the tree(bad approach, i.e. not dynamic)
+class Node:
+  def __init__(self,val=None,l=None,r=None):
+    self.val = val
+    self.left = l
+    self.right = r
+def maketree(l):
+  root = Node()   #node 0
+  node1 = Node()
+  node2 = Node()
+  node3 = Node()
+  node4 = Node()
+  node5 = Node()
+  node6 = Node()
+  leaf1 = Node(l[0])
+  leaf2 = Node(l[1])
+  leaf3 = Node(l[2])
+  leaf4 = Node(l[3])
+  leaf5 = Node(l[4])
+  leaf6 = Node(l[5])
+  leaf7 = Node(l[6])
+  leaf8 = Node(l[7])
+  root.left = node1
+  root.right = node2
+  node1.left = node3
+  node1.right = node4
+  node2.left = node5
+  node2.right = node6
+  node3.left = leaf1
+  node3.right = leaf2
+  node4.left = leaf3
+  node4.right = leaf4
+  node5.left = leaf5
+  node5.right = leaf6
+  node6.left = leaf7
+  node6.right = leaf8
+  return root
+
+def alphabeta(node,alpha,beta,depth):
+  # print(f"entered child node, alpha:{alpha}, beta:{beta}, current depth:{depth}")
+  if node.left == None:
+    return node.val
+  left = alphabeta(node.left,alpha,beta,depth+1) #left = child node.val
+  # print(f"came back from left child, alpha:{alpha}, beta:{beta}, current depth:{depth}")
+  if depth%2 == 0:     #if MAX-level
+    if left > alpha:
+      alpha = left
+  else:              #if MIN-level
+    # print(f"left:{left} beta:{beta}")
+    # print()
+    if left < beta:
+      beta = left
+  # print(f"alpha:{alpha}, beta:{beta}")
+  if alpha >= beta:  #prune
+    node.val = node.left.val   #update node value
+    # print('pruned')
+    return node.val
+  right = alphabeta(node.right,alpha,beta,depth+1)  #right = child node.val
+  # print(f"came back from right child, alpha:{alpha}, beta:{beta}, current depth:{depth}")
+  if depth%2 == 0:
+    if right > alpha:
+      alpha = right
+  else:
+    if right < beta:
+      beta = right
+  # print(f"alpha:{alpha}, beta:{beta}")
+  #update current node value:
+  if depth%2 == 0:
+    if node.left.val >= node.right.val:
+      node.val = node.left.val
+    else:
+      node.val = node.right.val
+  else:
+    if node.left.val <= node.right.val:
+      node.val = node.left.val
+    else:
+      node.val = node.right.val
+  return node.val
+
+root = maketree(limits)
+optimus = alphabeta(root,alpha=-math.inf,beta=math.inf,depth=0)
+# print(optimus)
+print(f"Generated 8 random points between the minimum and maximum point limits: {limits}")
+print(f"Total points to win: {to_win}")
+print(f"Achieved point by applying alpha-beta pruning = {optimus}")
+if optimus >= to_win:
+  print(f"The winner is Optimus Prime")
+else:
+  print(f"The winner is Megatron")
+
+#Task-2
+shuffles = int(id[3])
+values = []
+for i in range(shuffles):
+  random.shuffle(limits)
+  root = maketree(limits)
+  # print(limits)
+  value = alphabeta(root,alpha=-math.inf,beta=math.inf,depth=0)
+  values.append(value)
+# print(values)
+count = 0
+for i in range(len(values)):
+  if values[i] >= to_win:
+    count += 1
+print("After the shuffle:")
+print(f"List of all points values from each shuffle: {values}")
+print(f"The maximum value of all shuffles: {max(values)}")
+print(f"Won {count} times out of {shuffles} number of shuffles")
