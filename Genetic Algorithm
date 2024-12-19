@@ -1,0 +1,87 @@
+import random
+from operator import itemgetter
+
+n,t = input().split(' ')
+n = int(n)
+t = int(t)
+batsman = []
+runs = []
+for i in range(n):
+  b,r = input().split(' ')
+  batsman.append(b)
+  runs.append(int(r))
+# print(batsman)
+# print(runs)
+
+def fitness(population, iter, fit = []):
+  if iter == 250:    #maxm iterations
+    fit = sorted(fit,key=itemgetter(1))
+    # print(iter, end = ' ')
+    # print('woah')
+    print(batsman)
+    print(-1)
+    return
+  fit = [] #-> selected_batsman_array: list of fitness values along with corr. popln:[popln,fitness]
+  # print(iter, end = ' ')
+  for chrom in range(len(population)):
+    sum = 0     #sum is the total runs of selected batsmen
+    for i in range(len(population[chrom])):
+      if population[chrom][i] == '1':
+        sum += runs[i]
+    if sum == t:
+      # print('yahoo')
+      print(batsman)
+      print(population[chrom])
+      return
+    elif sum>t:
+      fn = -abs(t-sum)
+    else:
+      fn = sum
+    fit.append([population[chrom],fn])
+
+  fit = sorted(fit,key=itemgetter(1))
+  fit.pop(0)
+  # print(f"{population}{fit}")
+  crossover(population, fit, iter)
+
+def crossover(population, fit, iter):
+  pop2 = []           #temp popln
+  for i in range(len(fit)-1):
+    chrom1 = random.randint(0,len(fit)-1) # 2 random chromosomes chosen
+    chrom2 = random.randint(0,len(fit)-1)
+    split = random.randint(1,n-1)     #idx at which chrom will be split
+    pop2.append(fit[chrom1][0][0:split]+fit[chrom2][0][split:n])
+    pop2.append(fit[chrom2][0][0:split]+fit[chrom1][0][split:n])
+  # print(f"crossover:{pop2}")
+  mutation(pop2, fit, iter)
+
+def mutation(population, fit, iter):
+  for i in range(len(population)):
+    chrom = population[i]
+    mutate = random.randint(0,1) #if mutate == 1 -> mutate
+    if mutate == 1:
+      idx = random.randint(0,n-1)   #index at which mutation will occur
+      gene = chrom[idx]
+      if gene == '1':
+        for j in range(len(chrom)):
+          s = chrom[0:idx]+'0'+chrom[idx+1:] #since string is immutable
+      else:
+        s = chrom[0:idx]+'1'+chrom[idx+1:]
+      population[i] = s
+
+  iter += 1
+  # print(f"mutation:{population}{fit}")
+  fitness(population, iter, fit)
+
+population = []  #list of chromosomes
+iteration = 0
+for i in range(4):  #population size = 4
+  s = ''
+  for i in range(len(batsman)):
+    s += str(random.randint(0,1))     #binary encoded chromosome
+  population.append(s)
+# print(population)
+x = fitness(population,iteration)
+# print(x)
+
+#popln and fitness size keep increasing so fix these -> fixed
