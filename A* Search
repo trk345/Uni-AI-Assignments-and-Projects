@@ -1,0 +1,143 @@
+from operator import itemgetter,attrgetter
+text = open('/content/Input file.txt','r')
+h = {}
+graph = {}
+i = text.readline().strip()
+# print(i)
+l = i.split(' ')
+# print(l)
+while i!='':
+  l = i.split(' ')
+  h[l[0]] = int(l[1])
+  for i in range(2,len(l)-1,2):
+    if l[0] not in graph:
+      graph[l[0]] = [(l[i],int(l[i+1]))]
+    else:
+      graph[l[0]].append((l[i],int(l[i+1])))
+    # graph.append((l[0],l[i],int(l[i+1])))
+  i = text.readline().strip()
+# print(graph)
+# print(h)
+
+#Dijkstra
+source = 'Arad'
+goal = 'Bucharest' #doesnt work for lasi
+d = {}
+parent = {}
+pq = []
+visited = []
+
+for name in h:
+  pq.append([name,10**9])
+  d[name] = 10**9
+  parent[name] = []
+parent.pop('Arad')
+pq[0][1] = 0
+d[source] = 0
+while pq != []:
+  pq = sorted(pq, key = itemgetter(1))
+  u = pq.pop(0)
+  u = u[0]
+  visited.append(u)
+  u_val = d[u]
+  d.pop(u)
+
+  for i in range(len(graph[u])):
+    v = graph[u][i][0]
+    if v in visited:
+      continue
+    edge = graph[u][i][1]
+    dest = d[v]
+    if v in d and dest > u_val + edge:
+      d[v] = u_val + edge
+      parent[v] = [u]
+
+      for i in range(len(pq)):
+        if pq[i][0] == v:
+          pq[i][1] = u_val + edge
+          break
+
+# print(parent)
+
+#Checking if graph is disconnected, with goal not being connected to source
+flag = False #not disconnected
+node = goal
+while parent[node][0] != source:
+  if parent[node] == []:
+    flag = True #disconnected
+    break
+  else:
+    node = parent[node][0]
+
+def g_n(node,v,s):
+  if v == goal:
+    for i in range(len(graph[goal])):
+      if graph[goal][i][0] == node:
+        cost = graph[goal][i][1]
+        v = node
+        break
+  else:
+    cost = 0
+  u = v
+  while u != s:
+    u = parent[v][0]
+    for i in range(len(graph[v])):
+      if graph[v][i][0] == u:
+        cost += graph[v][i][1]        #cost += edge cost
+        break
+    v = u
+  return cost
+
+if flag == False:
+  fringe = []
+  # source = 'Arad'
+  # goal = 'Bucharest'
+  fringe.append([source,h[source]])
+  visited = [source]
+  popped = []
+  nodes = []  #consists of nodes that are directly connected to the goal node
+
+  u = source
+  while u != goal:
+    fringe = sorted(fringe, key = itemgetter(1))
+    u = fringe.pop(0)
+    u,u_fn = u[0],u[1]
+    popped.append(u)
+    for i in range(len(graph[u])):
+      #make separate f_n or g_n fnc
+      v = graph[u][i][0]
+      if v == goal or v not in visited:
+        gn = g_n(u,v,source)
+        f_n = gn + h[v]
+        fringe.append([v,f_n])
+        visited.append(v)
+        if v == goal:
+          nodes.append(u)
+
+  # print(u_fn)      #here u_fn is the f(n) value of the goal node
+  # print(visited)
+  # print(popped)
+  # print(nodes)
+  for i in range(len(nodes)):
+    cost = g_n(nodes[i],goal,source)
+    if cost == u_fn:
+      node = nodes[i]
+      break
+  path = [goal]
+  while node != source: #here, initially node is the parent node of the goal node
+    path.append(node)
+    node = parent[node][0]
+  path.append(source)
+
+  print('Path:', end = ' ')
+  for i in range(len(path)-1,-1,-1):
+    if i != 0:
+      print(f"{path[i]} ->", end = ' ')
+    else:
+      print(path[i])
+  print(f"Total distance: {u_fn}km")
+else:
+  print(f"NO PATH FOUND")
+
+
+text.close()
