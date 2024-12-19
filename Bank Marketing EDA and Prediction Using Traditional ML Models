@@ -1,0 +1,700 @@
+# Basic libraries
+import numpy as np
+import pandas as pd
+
+import math
+import random
+import datetime as dt
+import seaborn as sns
+import matplotlib.dates as mdates
+from sklearn.preprocessing import StandardScaler
+from scipy.stats import chi2_contingency
+
+# For visualization
+import matplotlib.pyplot as plt
+import matplotlib
+
+path = "/content/bank-full.csv"
+df = pd.read_csv(path)
+df.head()
+
+df = pd.read_csv(path,delimiter = ';')
+df.head()
+
+"""## EDA and Data Cleaning
+
+"""
+
+#dataset shape
+df.shape
+
+#dataset stats
+df.describe()
+
+df.info()
+
+df.isnull().sum()
+
+#to find features with a single value:NONE FOUND
+for column in df.columns:
+    print(column,df[column].nunique())
+
+#finding duplicated values
+duplicates = df.duplicated()
+print(duplicates)
+
+#exploring categorical features
+categorical_features=[feature for feature in df.columns if ((df[feature].dtypes=='O') & (feature not in ['y']))]
+categorical_features
+
+for feature in categorical_features:
+    print('The feature is {} and number of categories are {}'.format(feature,len(df[feature].unique())))
+
+#there are 9 categorical features, with "job" and "month" having the highest number of categories
+
+#checking count based on categorical features
+plt.figure(figsize=(15,80), facecolor='white')
+plotnumber =1
+for categorical_feature in categorical_features:
+    ax = plt.subplot(12,3,plotnumber)
+    sns.countplot(y=categorical_feature,data=df,hue=categorical_feature)
+    plt.xlabel(categorical_feature)
+    plt.title(categorical_feature)
+    plotnumber+=1
+plt.show()
+
+# clients with job type as management records are high in given dataset and student records are very less
+# clients who married are high in records in given dataset and divorced are less
+# clients with and without housing are more or less the same
+# clients whose education background are secondary are in high numbers in given dataset
+# default feature seems to not play an important role as it has value of no at high ratio to value of yes, meaning it can be dropped
+# data in month of may is high and very less in dec
+
+#checking target label split over categorical features
+#Finding out the relationship between categorical variable and dependent variable
+for categorical_feature in categorical_features:
+    sns.catplot(x='y', col=categorical_feature, kind='count', data= df, hue='y')
+plt.show()
+
+#Checking target label split over categorical features and find the count
+for categorical_feature in categorical_features:
+    print(df.groupby(['y',categorical_feature]).size())
+##y=deposit
+
+# student and retired clients have higher yes/no ratio for deposit
+# clients who have housing or loan don't seem to be much interested on deposit (i.e yes/no ratio is low)
+# if pre campagin outcome(poutcome)=success then, there is higher chance of client showing interest (yes/no ratio) on deposit
+# only in the month of March, clients show a higher interest to deposit
+# in the month of May, deposit records are high but client interest ratio (yes/no) is very less
+
+# list of numerical variables
+numerical_features = [feature for feature in df.columns if ((df[feature].dtypes != 'O') & (feature not in ['y']))] #checking if dtype is an object or not
+print('Number of numerical variables: ', len(numerical_features))
+
+# visualise the numerical variables
+df[numerical_features].head()
+
+#number of discrete features
+discrete_feature=[feature for feature in numerical_features if len(df[feature].unique())<25]
+print("Discrete Variables Count: {}".format(len(discrete_feature)))
+
+#continuous numerical features
+continuous_features=[feature for feature in numerical_features if feature not in discrete_feature+['y']]
+print("Continuous feature Count: {}".format(len(continuous_features)))
+
+#Distribution of continuous numerical features
+#plot a univariate distribution of continues observations
+plt.figure(figsize=(20,60), facecolor='white')
+plotnumber =1
+for continuous_feature in continuous_features:
+    ax = plt.subplot(12,3,plotnumber)
+    sns.distplot(df[continuous_feature])
+    plt.xlabel(continuous_feature)
+    plotnumber+=1
+plt.show()
+
+# age and day features seem to be closer to normal distribution
+# balance, duration, compaign, pdays and previous features are heavily skewed towards the left and seem to have some outliers
+
+# Relationship between continuous numerical features and target variable
+#boxplot to show target distribution with respect numerical features
+plt.figure(figsize=(20,60), facecolor='white')
+plotnumber =1
+for feature in continuous_features:
+    ax = plt.subplot(12,3,plotnumber)
+    sns.boxplot(x="y", y= df[feature], data=df, hue = 'y')
+    plt.xlabel(feature)
+    plotnumber+=1
+plt.show()
+
+#clients with a longer discussion duration seem to be more interested in deposit (i.e have a high yes/no ratio)
+
+#boxplot on numerical features to find outliers
+plt.figure(figsize=(20,60), facecolor='white')
+plotnumber =1
+for numerical_feature in numerical_features:
+    ax = plt.subplot(12,3,plotnumber)
+    sns.boxplot(x=df[numerical_feature])
+    plt.xlabel(numerical_feature)
+    plotnumber+=1
+plt.show()
+
+#balance, duration, compaign, pdays and previous have some outliers
+
+#Checking if dataset is balanced based on label
+sns.countplot(x='y',data=df, hue = 'y')
+plt.show()
+
+df['y'].groupby(df['y']).count()
+
+#dataset is kind of imbalanced (approx. 13%: yes, approx. 87%: no)
+
+#using one-hot encoding to label marital
+temp_df = pd.get_dummies(df['marital'],dtype =int,prefix='marital')
+df = pd.concat([temp_df,df],axis=1)
+df.drop('marital',axis=1,inplace=True)
+
+#using label encoding to encode every category besides job and marital
+education_map = {'unknown':0, 'primary':1, 'secondary':2, 'tertiary':3}
+default_map = {'yes':1, 'no':0}
+housing_map = {'yes':1, 'no':0}
+loan_map = {'yes':1, 'no':0}
+contact_map = {'unknown':0, 'telephone':1, 'cellular':2}
+poutcome_map = {'success':1, 'failure':0, 'other':0, 'unknown':0}
+month_map = {'jan':1,'feb':2,'mar':3,'apr':4,'may':5,'jun':6,'jul':7,'aug':8,'sep':9,'oct':10,'nov':11,'dec':12}
+y_map = {'yes':1,'no':0}
+
+df['education'] = df['education'].replace(education_map)
+df['default'] = df['default'].replace(default_map)
+df['housing'] = df['housing'].replace(housing_map)
+df['loan'] = df['loan'].replace(loan_map)
+df['contact'] = df['contact'].replace(contact_map)
+df['poutcome'] = df['poutcome'].replace(poutcome_map)
+df['month'] = df['month'].replace(month_map)
+df['y'] = df['y'].replace(y_map)
+
+#Using count/frequency encoding to encode job
+count = df['job'].value_counts()
+df['job'] = df['job'].map(count)
+df.head()
+
+#using standardscaler to scale the numerical features (age,balance,contact,duration,campaign,pdays,previous)
+numerical_features = ['age','balance','contact','duration','campaign','pdays','previous']
+df[numerical_features] = StandardScaler().fit_transform(df[numerical_features])
+df.head()
+
+#heatmap
+target_numerical = pd.concat([df[numerical_features],df['y']], axis = 1)
+corrmat = target_numerical.corr(method='spearman')
+# corrmat = df.corr(method = 'spearman')
+# top_features = corrmat.index
+plt.figure(figsize=(20,20))
+g = sns.heatmap(corrmat,annot=True)
+# h = sns.heatmap(df,annot=True)
+# plt.show()
+
+# it seems no feature is heavily correlated with other features
+
+# Calculate Spearman's rank correlation coefficients
+spearman_correlation = df.corr(method='spearman')['y'].drop('y')
+
+print(spearman_correlation.sort_values())
+
+#chi-square for categorical(higher chi-square value->stronger association with target, i.e. y)
+
+# Initialize an empty dictionary to store chi-square statistics
+chi2_statistics = {}
+target_categorical = ['job','education','default','housing','loan','contact', 'month','poutcome']
+# Loop through each encoded categorical feature
+for column in target_categorical:
+    # Create a contingency table between the feature and the target variable
+    contingency_table = pd.crosstab(df[column], df['y'])
+    # Perform the chi-square test
+    chi2, _, _, _ = chi2_contingency(contingency_table)
+    # Store the chi-square statistic
+    chi2_statistics[column] = chi2
+
+# Convert the dictionary to a pandas Series for easier manipulation
+chi2_series = pd.Series(chi2_statistics)
+
+# Sort the features by their chi-square statistics in descending order
+chi2_series = chi2_series.sort_values(ascending=False)
+
+print(chi2_series)
+
+#based on both Spearman correlation and chi-square: "marital" category has the weakest correlation. Hence, this field will be dropped.
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import TruncatedSVD
+
+target_categorical = ['job','education','default','housing','loan','contact', 'month','poutcome']
+
+# Fit TruncatedSVD
+svd = TruncatedSVD(n_components=min(df[target_categorical].shape))
+svd.fit(df[target_categorical])
+
+# Obtain the explained variance ratio for each component
+explained_variance_ratio = svd.explained_variance_ratio_
+
+# Calculate the cumulative explained variance
+cumulative_explained_variance = np.cumsum(explained_variance_ratio)
+
+# Plot the cumulative explained variance ratio
+plt.figure(figsize=(8, 6))
+plt.plot(range(1, len(cumulative_explained_variance) + 1), cumulative_explained_variance, marker='o', linestyle='-')
+plt.title('Cumulative Explained Variance Ratio')
+plt.xlabel('Number of Components')
+plt.ylabel('Cumulative Explained Variance Ratio')
+plt.grid(True)
+plt.show()
+
+import numpy as np
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+
+categorical_features = ['job', 'education', 'default', 'housing', 'loan', 'contact', 'month', 'poutcome']
+
+# Fit PCA
+pca = PCA()
+pca.fit(df[numerical_features])
+
+# Obtain the explained variance ratio for each component
+explained_variance_ratio = pca.explained_variance_ratio_
+
+# Calculate the cumulative explained variance
+cumulative_explained_variance = np.cumsum(explained_variance_ratio)
+
+# Plot the cumulative explained variance ratio
+plt.figure(figsize=(8, 6))
+plt.plot(range(1, len(cumulative_explained_variance) + 1), cumulative_explained_variance, marker='o', linestyle='-')
+plt.title('Cumulative Explained Variance Ratio')
+plt.xlabel('Number of Components')
+plt.ylabel('Cumulative Explained Variance Ratio')
+plt.grid(True)
+plt.show()
+
+# Load dataframe
+df = pd.read_csv(path, delimiter=';')
+
+# Dataset has no missing values, and no duplicates values. Therefore, no major cleaning required.
+
+# Drop features with little to no correlation/reduandant features
+df.drop(columns=["marital"])
+
+df.groupby(['y','pdays']).size()
+
+# dropping pdays as it has a large chunk of values for -1+
+df.drop(['pdays'],axis=1, inplace=True)
+
+# checking if outliers should be removed in the balance feature
+df.groupby(['y','balance'],sort=True)['balance'].count()
+# these outliers should not be remove as balance goes high, clients still show interest on deposit(y)
+
+# checking if outliers should be removed in the duration feature
+df.groupby(['y','duration'],sort=True)['duration'].count()
+# these outlier should not be remove as duration goes high, clients still show interest on deposit(y)
+
+# checking if outliers should be removed in the campaign feature
+df.groupby(['y','campaign'],sort=True)['campaign'].count()
+#remove!
+
+df = df[df['campaign'] < 33]
+#after removing outliers,
+df.groupby(['y','campaign'],sort=True)['campaign'].count()
+
+#checking if outliers should be removed in the previous feature
+df.groupby(['y','previous'],sort=True)['previous'].count()
+#remove!
+
+df = df[df['previous'] < 31]
+
+"""## Feature Extraction"""
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+
+df = df.replace({'yes': 1, 'no': 0})
+
+# Define X (features) and y (target variable)
+X = df.drop(columns=['y'])  # Features
+y = df['y']  # Target variable
+
+# Split the data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Define numerical and categorical features
+numerical_features = ['age', 'balance', 'day', 'duration', 'campaign', 'previous']
+categorical_features = ['job', 'education', 'default', 'housing', 'loan', 'contact', 'month', 'poutcome']
+
+# Create preprocessing pipelines for numerical and categorical data
+numerical_pipeline = Pipeline([
+    ('scaler', StandardScaler()),
+    ('principalComponents',PCA(n_components=2))
+])
+
+categorical_pipeline = Pipeline([
+    ('encoder', OneHotEncoder(drop='first')),
+    ('sdv', TruncatedSVD(n_components=6))
+])
+
+# Combine preprocessing pipelines
+preprocessor = ColumnTransformer([
+    ('num', numerical_pipeline, numerical_features),
+    ('cat', categorical_pipeline, categorical_features)
+])
+
+# Preprocess the training data
+X_train_preprocessed = preprocessor.fit_transform(X_train)
+
+# Preprocess the testing data
+X_test_preprocessed = preprocessor.transform(X_test)
+
+X_test_dense_df = pd.DataFrame(X_test_preprocessed)
+X_test_dense_df.head()
+
+"""## Data Modeling
+
+Models (Tentative)
+
+*  Random Forest
+*  Decision Trees
+*  Logistic Regression
+*  Gradient Boosting Machines (e.g., XGBoost, LightGBM)
+*  Support Vector Machines (SVM)
+*  Or others
+
+
+Performance Measures
+*   Accuracy
+*   Precision
+*   Recall
+*   F1
+*   ROC
+
+
+
+
+
+
+
+"""
+
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+import xgboost as xgb
+import lightgbm as lgb
+from sklearn import svm
+import matplotlib.pyplot as plt
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
+
+"""1. Random Forest classifier"""
+
+# Initialize the Random Forest classifier
+rf = RandomForestClassifier(random_state=42)
+
+# Train the classifier on the training data
+rf.fit(X_train_preprocessed, y_train)
+
+# Predict the target variable on the testing data
+y_pred = rf.predict(X_test_preprocessed)
+
+# Predict on the training data
+y_train_pred = rf.predict(X_train_preprocessed)
+
+# Calculate train accuracy
+rf_train_accuracy = accuracy_score(y_train, y_train_pred)
+print("Train Accuracy:", rf_train_accuracy)
+
+# Calculate test accuracy
+rf_test_accuracy = accuracy_score(y_test, y_pred)
+print("Test Accuracy:", rf_test_accuracy)
+
+# Calculate precision
+rf_precision = precision_score(y_test, y_pred)
+print("Precision:", rf_precision)
+
+# Calculate recall
+rf_recall = recall_score(y_test, y_pred)
+print("Recall:", rf_recall)
+
+# Calculate F1-score
+rf_f1 = f1_score(y_test, y_pred)
+print("F1-score:", rf_f1)
+
+# Calculate ROC-AUC score
+rf_roc_auc = roc_auc_score(y_test, y_pred)
+print("ROC-AUC Score:", rf_roc_auc)
+
+# Calculate confusion matrix
+rf_conf_matrix = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:")
+print(rf_conf_matrix)
+
+"""2. Decision Tree Classifier"""
+
+# Initialize Decision Tree classifier
+dt = DecisionTreeClassifier(random_state=42)
+
+# Train the classifier
+dt.fit(X_train_preprocessed, y_train)
+
+# Predict on the testing data
+y_pred = dt.predict(X_test_preprocessed)
+
+# Predict on the training data
+y_train_pred = dt.predict(X_train_preprocessed)
+
+# Calculate train accuracy
+dt_train_accuracy = accuracy_score(y_train, y_train_pred)
+print("Train Accuracy:", dt_train_accuracy)
+
+# Calculate test accuracy
+dt_test_accuracy = accuracy_score(y_test, y_pred)
+print("Test Accuracy:", dt_test_accuracy)
+
+# Calculate precision
+dt_precision = precision_score(y_test, y_pred)
+print("Precision:", dt_precision)
+
+# Calculate recall
+dt_recall = recall_score(y_test, y_pred)
+print("Recall:", dt_recall)
+
+# Calculate F1-score
+dt_f1 = f1_score(y_test, y_pred)
+print("F1-score:", dt_f1)
+
+# Calculate ROC-AUC score
+dt_roc_auc = roc_auc_score(y_test, y_pred)
+print("ROC-AUC Score:", dt_roc_auc)
+
+# Calculate confusion matrix
+dt_conf_matrix = confusion_matrix(y_test, y_pred)
+print("Confusion Matrix:")
+print(dt_conf_matrix)
+
+"""3. Logistic Regression Classifier"""
+
+# Initialize the Logistic Regression classifier
+lr = LogisticRegression(random_state=42)
+
+# Train the classifier on the training data
+lr.fit(X_train_preprocessed, y_train)
+
+# Predict the target variable on the testing data
+y_pred_lr = lr.predict(X_test_preprocessed)
+
+# Predict on the training data
+y_train_pred_lr = lr.predict(X_train_preprocessed)
+
+# Calculate train accuracy
+lr_train_accuracy = accuracy_score(y_train, y_train_pred_lr)
+print("Train Accuracy:", lr_train_accuracy)
+
+# Calculate test accuracy
+lr_test_accuracy = accuracy_score(y_test, y_pred_lr)
+print("Test Accuracy:", lr_test_accuracy)
+
+#  precision
+lr_precision = precision_score(y_test, y_pred_lr)
+print("Precision:", lr_precision)
+
+# recall
+lr_recall = recall_score(y_test, y_pred_lr)
+print("Recall:", lr_recall)
+
+# F1-score
+lr_f1 = f1_score(y_test, y_pred_lr)
+print("F1-score:", lr_f1)
+
+# ROC-AUC score
+lr_roc_auc = roc_auc_score(y_test, y_pred_lr)
+print("ROC-AUC Score:", lr_roc_auc)
+
+# confusion matrix
+lr_conf_matrix = confusion_matrix(y_test, y_pred_lr)
+print("Confusion Matrix:")
+print(lr_conf_matrix)
+
+"""4. XGBClassifier"""
+
+xg_clf = xgb.XGBClassifier(random_state=42)
+xg_clf.fit(X_train_preprocessed, y_train)
+
+y_pred_xg = xg_clf.predict(X_test_preprocessed)
+y_train_pred_xg = xg_clf.predict(X_train_preprocessed)
+
+xg_train_accuracy = accuracy_score(y_train, y_train_pred_xg)
+print("Train Accuracy:", xg_train_accuracy)
+
+xg_test_accuracy = accuracy_score(y_test, y_pred_xg)
+print("Test Accuracy:",xg_test_accuracy)
+
+xg_precision = precision_score(y_test, y_pred_xg)
+print("Precision:", xg_precision)
+
+xg_recall = recall_score(y_test, y_pred_xg)
+print("Recall:", xg_recall)
+
+xg_f1 = f1_score(y_test, y_pred_xg)
+print("F1:", xg_f1)
+
+xg_roc_auc = roc_auc_score(y_test, y_pred_xg)
+print("ROC auc", xg_roc_auc)
+
+xg_conf_matrix = confusion_matrix(y_test, y_pred_xg)
+print("Confusion Matrix:")
+print(xg_conf_matrix)
+
+lgb_clf = lgb.LGBMClassifier(random_state=42)
+lgb_clf.fit(X_train_preprocessed, y_train)
+
+y_pred_lgb = lgb_clf.predict(X_test_preprocessed)
+y_train_pred_lgb = lgb_clf.predict(X_train_preprocessed)
+
+lgb_train_accuracy = accuracy_score(y_train, y_train_pred_lgb)
+print("Train Accuracy:",lgb_train_accuracy)
+
+lgb_test_accuracy = accuracy_score(y_test, y_pred_lgb)
+print("Test Accuracy:" ,lgb_test_accuracy)
+
+lgb_precision = precision_score(y_test, y_pred_lgb)
+print("Precision:", lgb_precision)
+
+lgb_recall = recall_score(y_test, y_pred_lgb)
+print("Recall:", lgb_recall)
+
+lgb_f1 = f1_score(y_test, y_pred_lgb)
+print("F1:", lgb_f1)
+
+lgb_roc_auc = roc_auc_score(y_test, y_pred_lgb)
+print("ROC acc:", lgb_roc_auc)
+
+lgb_conf_matrix = confusion_matrix(y_test, y_pred_lgb)
+print("Confusion Matrix:")
+print(lgb_conf_matrix)
+
+"""**5**. __SVM__ Classifier"""
+
+# Initialize the SVM classifier
+svm_clf = svm.SVC(random_state=42)
+
+# Train the classifier on the training data
+svm_clf.fit(X_train_preprocessed, y_train)
+
+# Predict the target variable on the testing data
+y_pred_svm = svm_clf.predict(X_test_preprocessed)
+
+# Predict on the training data
+y_train_pred_svm = svm_clf.predict(X_train_preprocessed)
+
+# Calculate train accuracy
+svm_train_accuracy = accuracy_score(y_train, y_train_pred_svm)
+print("Train Accuracy:", svm_train_accuracy)
+
+# Calculate test accuracy
+svm_test_accuracy = accuracy_score(y_test, y_pred_svm)
+print("Train Accuracy:", svm_test_accuracy)
+
+# Calculate precision
+svm_precision = precision_score(y_test, y_pred_svm)
+print("Precision:", svm_precision)
+
+# Calculate recall
+svm_recall = recall_score(y_test, y_pred_svm)
+print("Recall:" ,svm_recall)
+
+# Calculate F1-score
+svm_f1 = f1_score(y_test, y_pred_svm)
+print("F1-Score:",svm_f1)
+
+# Calculate ROC-AUC score
+svm_roc_auc = roc_auc_score(y_test, y_pred_svm)
+print("ROC-AUC:" ,svm_roc_auc)
+
+# Calculate confusion matrix
+print("Confusion Matrix:")
+svm_conf_matrix = confusion_matrix(y_test, y_pred_svm)
+print(svm_conf_matrix)
+
+"""## Data Visualization"""
+
+#test accuracy
+rf_test_accuracy_percent = rf_test_accuracy * 100
+dt_test_accuracy_percent = dt_test_accuracy * 100
+lr_test_accuracy_percent = lr_test_accuracy * 100
+xg_test_accuracy_percent = xg_test_accuracy * 100
+lgb_test_accuracy_percent = lgb_test_accuracy * 100
+svm_test_accuracy_percent = svm_test_accuracy * 100
+classifiers = ['Random Forest', 'Decision Tree', 'Logistic Regression', 'XGBoost', 'LightGBM', 'SVM']
+accuracy_scores = [rf_test_accuracy_percent, dt_test_accuracy_percent, lr_test_accuracy_percent, xg_test_accuracy_percent, lgb_test_accuracy_percent, svm_test_accuracy_percent]
+plt.figure(figsize=(10, 5))
+plt.bar(classifiers, accuracy_scores, color=['blue', 'green', 'red', 'cyan', 'magenta', 'yellow'])
+plt.xlabel('Classifiers')
+plt.ylabel('Accuracy Score (%)')
+plt.title('Test Accuracy Scores of Different Classifiers')
+plt.show()
+
+#precision
+rf_precision_percent = rf_precision * 100
+dt_precision_percent = dt_precision * 100
+lr_precision_percent = lr_precision * 100
+xg_precision_percent = xg_precision * 100
+lgb_precision_percent = lgb_precision * 100
+svm_precision_percent = svm_precision * 100
+classifiers = ['Random Forest', 'Decision Tree', 'Logistic Regression', 'XGBoost', 'LightGBM', 'SVM']
+plt.figure(figsize=(10, 5))
+plt.bar(classifiers, [rf_precision_percent, dt_precision_percent, lr_precision_percent, xg_precision_percent, lgb_precision_percent, svm_precision_percent], color=['blue', 'green', 'red', 'cyan', 'magenta', 'yellow'])
+plt.xlabel('Classifiers')
+plt.ylabel('Precision Score (%)')
+plt.title('Precision Scores of Different Classifiers')
+plt.show()
+
+#Recall
+rf_recall_percent = rf_recall * 100
+dt_recall_percent = dt_recall * 100
+lr_recall_percent = lr_recall * 100
+xg_recall_percent = xg_recall * 100
+lgb_recall_percent = lgb_recall * 100
+svm_recall_percent = svm_recall * 100
+classifiers = ['Random Forest', 'Decision Tree', 'Logistic Regression', 'XGBoost', 'LightGBM', 'SVM']
+plt.figure(figsize=(10, 5))
+plt.bar(classifiers, [rf_recall_percent, dt_recall_percent, lr_recall_percent, xg_recall_percent, lgb_recall_percent, svm_recall_percent], color=['blue', 'green', 'red', 'cyan', 'magenta', 'yellow'])
+plt.xlabel('Classifiers')
+plt.ylabel('Recall Score (%)')
+plt.title('Recall Scores of Different Classifiers')
+plt.show()
+
+#F1-Score
+rf_f1_percent = rf_f1 * 100
+dt_f1_percent = dt_f1 * 100
+lr_f1_percent = lr_f1 * 100
+xg_f1_percent = xg_f1 * 100
+lgb_f1_percent = lgb_f1 * 100
+svm_f1_percent = svm_f1 * 100
+classifiers = ['Random Forest', 'Decision Tree', 'Logistic Regression', 'XGBoost', 'LightGBM', 'SVM']
+plt.figure(figsize=(10, 5))
+plt.bar(classifiers, [rf_f1_percent, dt_f1_percent, lr_f1_percent, xg_f1_percent, lgb_f1_percent, svm_f1_percent], color=['blue', 'green', 'red', 'cyan', 'magenta', 'yellow'])
+plt.xlabel('Classifiers')
+plt.ylabel('F1 Score (%)')
+plt.title('F1 Scores of Different Classifiers')
+plt.show()
+
+#ROC-Accuracy
+rf_roc_auc_percent = rf_roc_auc * 100
+dt_roc_auc_percent = dt_roc_auc * 100
+lr_roc_auc_percent = lr_roc_auc * 100
+xg_roc_auc_percent = xg_roc_auc * 100
+lgb_roc_auc_percent = lgb_roc_auc * 100
+svm_roc_auc_percent = svm_roc_auc * 100
+classifiers = ['Random Forest', 'Decision Tree', 'Logistic Regression', 'XGBoost', 'LightGBM', 'SVM']
+plt.figure(figsize=(10, 5))
+plt.bar(classifiers, [rf_roc_auc_percent, dt_roc_auc_percent, lr_roc_auc_percent, xg_roc_auc_percent, lgb_roc_auc_percent, svm_roc_auc_percent], color=['blue', 'green', 'red', 'cyan', 'magenta', 'yellow'])
+plt.xlabel('Classifiers')
+plt.ylabel('ROC-AUC Score (%)')
+plt.title('ROC-AUC Scores of Different Classifiers')
+plt.show()
